@@ -1,32 +1,31 @@
 import { type CurrencyId } from '../types'
 
-export const CURRENCIES: Record<CurrencyId, { label: string; loc: string; dec: number; sym: string; rate: number }> = {
-  cad: { label: '$ CA', loc: 'fr-CA', dec: 2, sym: '$', rate: 1 },
-  usd: { label: '$ US', loc: 'en-US', dec: 2, sym: '$', rate: 0.73 },
-  fcfa: { label: 'FCFA', loc: 'fr-FR', dec: 0, sym: 'FCFA', rate: 450 },
-  eur: { label: '€ EUR', loc: 'fr-FR', dec: 2, sym: '€', rate: 0.68 },
+export const CURRENCIES: Record<CurrencyId, { label: string; loc: string; dec: number; sym: string }> = {
+  cad: { label: '$ CA', loc: 'fr-CA', dec: 2, sym: '$' },
+  usd: { label: '$ US', loc: 'en-US', dec: 2, sym: '$' },
+  fcfa: { label: 'FCFA', loc: 'fr-FR', dec: 0, sym: 'FCFA' },
+  eur: { label: '€ EUR', loc: 'fr-FR', dec: 2, sym: '€' },
 }
 
 /**
- * Format currency with full precision (decimals as defined per currency).
- * Use for main balance displays, transaction amounts, and budget values.
+ * Format a number in the selected currency.
+ * Amounts are stored as-is in the user's chosen currency — no conversion applied.
  */
 export function fmt(n: number, currency: CurrencyId = 'cad'): string {
   const c = CURRENCIES[currency]
-  const converted = n * c.rate
-  return `${converted.toLocaleString(c.loc, { minimumFractionDigits: c.dec, maximumFractionDigits: c.dec })} ${c.sym === 'FCFA' ? 'FCFA' : c.sym}`
+  const formatted = n.toLocaleString(c.loc, { minimumFractionDigits: c.dec, maximumFractionDigits: c.dec })
+  return currency === 'fcfa' ? `${formatted} FCFA` : `${c.sym}${formatted}`
 }
 
 /**
- * Format currency in compact form (rounded to whole numbers, with 'k' suffix for thousands).
- * Use for chart labels, small display areas, and summary statistics.
+ * Compact format: whole numbers, 'k' suffix for thousands.
  */
 export function fmtShort(n: number, currency: CurrencyId = 'cad'): string {
   const c = CURRENCIES[currency]
-  const converted = n * c.rate
-  const sym = c.sym === 'FCFA' ? 'FCFA' : c.sym
-  if (Math.abs(converted) >= 1000) return `${(converted / 1000).toFixed(1)}k ${sym}`
-  return `${Math.round(converted).toLocaleString(c.loc)} ${sym}`
+  const abs = Math.abs(n)
+  const sign = n < 0 ? '-' : ''
+  const val = abs >= 1000 ? `${(abs / 1000).toFixed(1)}k` : String(Math.round(abs))
+  return currency === 'fcfa' ? `${sign}${val} FCFA` : `${sign}${c.sym}${val}`
 }
 
 /**

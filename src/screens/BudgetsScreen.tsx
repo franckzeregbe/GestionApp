@@ -4,6 +4,7 @@ import {
   StyleSheet, Animated, Dimensions, KeyboardAvoidingView, Platform, Pressable,
 } from 'react-native'
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { COLORS } from '../theme'
 import { CATEGORIES, ICONS } from '../utils/constants'
 import { fmt, mkKey } from '../utils/currency'
@@ -23,6 +24,7 @@ interface Props {
 
 export default function BudgetsScreen({ transactions, budgets, onSaveBudget, currentMonth, theme, currency }: Props) {
   const C = COLORS[theme]
+  const insets = useSafeAreaInsets()
   const monthKey = mkKey(currentMonth)
   const slide = useRef(new Animated.Value(SH)).current
   const tabBarHeight = useBottomTabBarHeight()
@@ -137,6 +139,12 @@ export default function BudgetsScreen({ transactions, budgets, onSaveBudget, cur
               style={[st.sheet, { backgroundColor: C.surface, borderColor: C.border }, { transform: [{ translateY: slide }] }]}
             >
               <View style={[st.handle, { backgroundColor: C.border }]} />
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                bounces={false}
+                contentContainerStyle={{ paddingBottom: insets.bottom + 8 }}
+              >
               <View style={st.sheetTitleRow}>
                 <Text style={[st.sheetTitle, { color: C.text }]}>{editingCat ? 'Modifier le budget' : 'Nouveau budget'}</Text>
                 <TouchableOpacity onPress={() => setModalVisible(false)} style={[st.closeBtn, { backgroundColor: C.surface2 }]}>
@@ -166,6 +174,7 @@ export default function BudgetsScreen({ transactions, budgets, onSaveBudget, cur
               <TouchableOpacity style={[st.saveBtn, { backgroundColor: C.primary }]} onPress={handleSave} activeOpacity={0.85}>
                 <Text style={st.saveBtnText}>Enregistrer</Text>
               </TouchableOpacity>
+              </ScrollView>
             </Animated.View>
           </Pressable>
         </KeyboardAvoidingView>
@@ -250,8 +259,8 @@ const st = StyleSheet.create({
   sheet: {
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
     borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 20, paddingBottom: 36,
-    maxHeight: SH * 0.85,
+    paddingHorizontal: 20,
+    maxHeight: SH * 0.90,
   },
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 4 },
   sheetTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },

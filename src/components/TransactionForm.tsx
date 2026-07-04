@@ -4,6 +4,7 @@ import {
   Modal, Animated, Alert, StyleSheet, Dimensions,
   KeyboardAvoidingView, Platform, Pressable,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { type Transaction } from '../types'
 import { CATEGORIES } from '../utils/constants'
 import { COLORS } from '../theme'
@@ -32,6 +33,7 @@ interface Props {
 
 export default function TransactionForm({ visible, editTx, theme, onSave, onEdit, onClose }: Props) {
   const C = COLORS[theme]
+  const insets = useSafeAreaInsets()
   const slide = useRef(new Animated.Value(SH)).current
   const [form, setForm] = useState<FormState>({ type: 'expense', category: '', amount: '', date: today(), note: '' })
 
@@ -72,7 +74,12 @@ export default function TransactionForm({ visible, editTx, theme, onSave, onEdit
           >
             <View style={[s.handle, { backgroundColor: C.border }]} />
 
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" bounces={false}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              bounces={false}
+              contentContainerStyle={{ paddingBottom: insets.bottom + 8 }}
+            >
               {/* Titre */}
               <View style={s.titleRow}>
                 <Text style={[s.title, { color: C.text }]}>
@@ -167,8 +174,8 @@ const s = StyleSheet.create({
   sheet: {
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
     borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 20, paddingBottom: 32,
-    maxHeight: SH * 0.92,
+    paddingHorizontal: 20,
+    maxHeight: SH * 0.94,
   },
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 4 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },
