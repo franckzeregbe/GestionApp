@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, Modal, TextInput, TouchableOpacity,
   StyleSheet, Animated, Dimensions, KeyboardAvoidingView, Platform, Pressable,
 } from 'react-native'
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs'
 import { COLORS } from '../theme'
 import { CATEGORIES, ICONS } from '../utils/constants'
 import { fmt, mkKey } from '../utils/currency'
@@ -24,6 +25,7 @@ export default function BudgetsScreen({ transactions, budgets, onSaveBudget, cur
   const C = COLORS[theme]
   const monthKey = mkKey(currentMonth)
   const slide = useRef(new Animated.Value(SH)).current
+  const tabBarHeight = useBottomTabBarHeight()
 
   const spentMap = useMemo(() => {
     const map: Record<string, number> = {}
@@ -104,7 +106,7 @@ export default function BudgetsScreen({ transactions, budgets, onSaveBudget, cur
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={st.list} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[st.list, { paddingBottom: tabBarHeight + 16 }]} showsVerticalScrollIndicator={false}>
           {entries.map(([cat, budget]) => {
             const spent = spentMap[cat] || 0
             const pct = budget > 0 ? (spent / budget) * 100 : 0
@@ -220,7 +222,7 @@ const st = StyleSheet.create({
   globalBarBg: { height: 6, borderRadius: 3, overflow: 'hidden' },
   globalBarFill: { height: '100%', borderRadius: 3 },
   globalPct: { fontSize: 11, fontWeight: '500', marginTop: 6, textAlign: 'right' },
-  list: { padding: 16, paddingBottom: 100 },
+  list: { padding: 16, paddingBottom: 16 },
   card: { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, padding: 14, marginBottom: 10 },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
   cardIconWrap: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

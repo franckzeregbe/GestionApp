@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, FlatList, TouchableOpacity,
   Modal, Animated, Alert, StyleSheet, Dimensions, Pressable,
 } from 'react-native'
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs'
 import { type Transaction, type CurrencyId } from '../types'
 import { ICONS, MONTHS_SHORT } from '../utils/constants'
 import { fmt } from '../utils/currency'
@@ -28,6 +29,7 @@ function fmtDate(s: string): string {
 export default function TransactionsScreen({ transactions, onDeleteTx, onEditTransaction, theme, currency }: Props) {
   const C = COLORS[theme]
   const slide = useRef(new Animated.Value(SH)).current
+  const tabBarHeight = useBottomTabBarHeight()
   const [search, setSearch] = useState('')
   const [actionTx, setActionTx] = useState<Transaction | null>(null)
   const [showAction, setShowAction] = useState(false)
@@ -125,7 +127,7 @@ export default function TransactionsScreen({ transactions, onDeleteTx, onEditTra
           data={filtered}
           keyExtractor={i => String(i.id)}
           renderItem={renderItem}
-          contentContainerStyle={st.list}
+          contentContainerStyle={[st.list, { paddingBottom: tabBarHeight + 16 }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         />
@@ -187,7 +189,7 @@ const st = StyleSheet.create({
   searchIcon: { fontSize: 14, marginRight: 8 },
   searchInput: { flex: 1, fontSize: 15 },
   searchClear: { fontSize: 13, paddingLeft: 8 },
-  list: { paddingHorizontal: 16, paddingBottom: 100 },
+  list: { paddingHorizontal: 16, paddingBottom: 16 },
   item: {
     flexDirection: 'row', alignItems: 'center',
     padding: 12, borderRadius: 14,

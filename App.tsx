@@ -151,12 +151,13 @@ function AppContent() {
     />
   ), [transactions, budgets, handleSaveBudget, currentMonth, theme, currency])
 
+  const TAB_H = 60
   const tabBarStyle = {
     backgroundColor: C.surface,
     borderTopColor: C.border,
     borderTopWidth: StyleSheet.hairlineWidth,
-    height: 60 + (Platform.OS === 'ios' ? insets.bottom : 0),
-    paddingBottom: Platform.OS === 'ios' ? insets.bottom : 8,
+    height: TAB_H + insets.bottom,
+    paddingBottom: insets.bottom || 8,
     paddingTop: 6,
     elevation: 0,
   }

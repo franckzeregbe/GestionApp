@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, LayoutChangeEvent } from 'react-native'
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs'
 import Svg, { Polyline, Line, Circle, Text as SvgText } from 'react-native-svg'
 import { COLORS } from '../theme'
 import { MONTHS_FR, MONTHS_SHORT, ICONS } from '../utils/constants'
@@ -96,10 +97,12 @@ export default function DashboardScreen({ transactions, budgets, onDeleteTx, cur
 
   const CARD_W = width > 0 ? (width - PAD * 2 - 8) / 3 : 100
 
+  const tabBarHeight = useBottomTabBarHeight()
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: C.bg }}
-      contentContainerStyle={{ padding: PAD, paddingBottom: 32 }}
+      contentContainerStyle={{ padding: PAD, paddingBottom: tabBarHeight + 16 }}
       showsVerticalScrollIndicator={false}
       onLayout={onLayout}
     >

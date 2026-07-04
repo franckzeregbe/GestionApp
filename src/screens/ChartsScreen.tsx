@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react'
 import { View, Text, ScrollView, StyleSheet, LayoutChangeEvent } from 'react-native'
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs'
 import Svg, { Path, G, Rect, Line, Circle, Polyline, Polygon, Text as SvgText } from 'react-native-svg'
 import { type Transaction, type CurrencyId } from '../types'
 import { COLORS, CHART_COLORS } from '../theme'
@@ -114,9 +115,11 @@ export default function ChartsScreen({ transactions, theme, currentMonth, curren
     return { v: Math.round(v), y }
   })
 
+  const tabBarHeight = useBottomTabBarHeight()
+
   return (
     <View style={{ flex: 1 }} onLayout={onLayout}>
-      <ScrollView style={[s.container, { backgroundColor: c.bg }]} contentContainerStyle={s.content}>
+      <ScrollView style={[s.container, { backgroundColor: c.bg }]} contentContainerStyle={[s.content, { paddingBottom: tabBarHeight + 16 }]}>
           {/* 1. Donut */}
           <View style={[s.card, { backgroundColor: c.surface }]}>
             <Text style={[s.cardTitle, { color: c.text }]}>Répartition des dépenses</Text>
@@ -244,7 +247,7 @@ export default function ChartsScreen({ transactions, theme, currentMonth, curren
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 16, paddingBottom: 32 },
+  content: { padding: 16, paddingBottom: 100 },
   card: { borderRadius: 14, padding: 16, marginBottom: 16, overflow: 'hidden' },
   cardTitle: { fontSize: 16, fontWeight: '600', marginBottom: 16 },
   donutWrap: { alignItems: 'center' },
