@@ -7,7 +7,7 @@ import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { COLORS } from '../theme'
 import { CATEGORIES, ICONS } from '../utils/constants'
-import { fmt, mkKey } from '../utils/currency'
+import { fmt, convert, mkKey } from '../utils/currency'
 import CategoryPicker from '../components/CategoryPicker'
 import type { Transaction, Budgets, CurrencyId } from '../types'
 
@@ -33,10 +33,16 @@ export default function BudgetsScreen({ transactions, budgets, onSaveBudget, cur
     const map: Record<string, number> = {}
     for (const t of transactions) {
       if (t.type === 'expense' && t.date.startsWith(monthKey))
-        map[t.category] = (map[t.category] || 0) + t.amount
+        map[t.category] = (map[t.category] || 0) + convert(t.amount, t.currency ?? currency, currency)
     }
     return map
-  }, [transactions, monthKey])
+  }, [transactions, monthKey, currency])
+
+  // Pour les budgets, on permet aussi les catégories de revenus (ex: épargne objectif)
+  const allCategories = useMemo(() => {
+    const custom = transactions.map(t => t.category).filter(c => !CATEGORIES.expense.includes(c) && !CATEGORIES.income.includes(c))
+    return [...new Set([...CATEGORIES.expense, ...custom])]
+  }, [transactions])
 
   const [modalVisible, setModalVisible] = useState(false)
   const [editingCat, setEditingCat] = useState<string | null>(null)
@@ -53,7 +59,7 @@ export default function BudgetsScreen({ transactions, budgets, onSaveBudget, cur
 
   const openAdd = () => {
     setEditingCat(null)
-    setSelectedCat(CATEGORIES.expense[0])
+    setSelectedCat(allCategories[0] || CATEGORIES.expense[0])
     setAmountText('')
     setModalVisible(true)
   }
@@ -83,7 +89,7 @@ export default function BudgetsScreen({ transactions, budgets, onSaveBudget, cur
         <View style={[st.summary, { backgroundColor: C.surface, borderColor: C.border }]}>
           <View style={st.summaryRow}>
             <View>
-              <Text style={[st.summaryLabel, { color: C.text2 }]}>Total dépensé</Text>
+              <Text style={[st.summaryLabel, { color: C.text2 }]}>Total sorti</Text>
               <Text style={[st.summaryVal, { color: C.red }]}>{fmt(totalSpent, currency)}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
@@ -154,7 +160,7 @@ export default function BudgetsScreen({ transactions, budgets, onSaveBudget, cur
 
               <Text style={[st.label, { color: C.text2 }]}>Catégorie</Text>
               <CategoryPicker
-                categories={CATEGORIES.expense}
+                categories={allCategories}
                 selected={selectedCat}
                 onSelect={setSelectedCat}
                 theme={theme}

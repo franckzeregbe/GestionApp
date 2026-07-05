@@ -3,6 +3,7 @@ export interface Transaction {
   type: 'income' | 'expense'
   category: string
   amount: number
+  currency: CurrencyId   // devise dans laquelle le montant a été saisi
   date: string
   note: string
 }

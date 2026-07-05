@@ -285,6 +285,7 @@ function AppContent() {
         visible={showForm}
         editTx={editingTx}
         theme={theme}
+        currency={currency}
         onSave={handleAddTx}
         onEdit={handleEditTx}
         onClose={handleCloseForm}

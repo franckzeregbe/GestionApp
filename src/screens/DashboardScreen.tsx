@@ -4,7 +4,7 @@ import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs'
 import Svg, { Polyline, Line, Circle, Text as SvgText } from 'react-native-svg'
 import { COLORS } from '../theme'
 import { MONTHS_FR, MONTHS_SHORT, ICONS } from '../utils/constants'
-import { fmt, fmtShort, mkKey, parseDate } from '../utils/currency'
+import { fmt, fmtShort, fmtC, fmtShortC, convert, mkKey, parseDate } from '../utils/currency'
 import { type Transaction, type Budgets, type CurrencyId } from '../types'
 
 interface Props {
@@ -29,38 +29,41 @@ export default function DashboardScreen({ transactions, budgets, onDeleteTx, cur
   const mo = currentMonth.getMonth()
 
   const monthData = useMemo(() => {
-    const inc = transactions.filter(t => t.type === 'income' && t.date.startsWith(key)).reduce((s, t) => s + t.amount, 0)
-    const exp = transactions.filter(t => t.type === 'expense' && t.date.startsWith(key)).reduce((s, t) => s + t.amount, 0)
+    const txMonth = transactions.filter(t => t.date.startsWith(key))
+    const inc = txMonth.filter(t => t.type === 'income').reduce((s, t) => s + convert(t.amount, t.currency ?? currency, currency), 0)
+    const exp = txMonth.filter(t => t.type === 'expense').reduce((s, t) => s + convert(t.amount, t.currency ?? currency, currency), 0)
     return { inc, exp, balance: inc - exp }
-  }, [transactions, key])
+  }, [transactions, key, currency])
 
   const topExpenses = useMemo(() => {
     const map: Record<string, number> = {}
     transactions.filter(t => t.type === 'expense' && t.date.startsWith(key))
-      .forEach(t => { map[t.category] = (map[t.category] || 0) + t.amount })
+      .forEach(t => { map[t.category] = (map[t.category] || 0) + convert(t.amount, t.currency ?? currency, currency) })
     return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5)
-  }, [transactions, key])
+  }, [transactions, key, currency])
 
   const last6 = useMemo(() => {
     return Array.from({ length: 6 }, (_, i) => {
       const d = new Date(yr, mo - (5 - i), 1)
       const k = mkKey(d)
-      const inc = transactions.filter(t => t.type === 'income' && t.date.startsWith(k)).reduce((s, t) => s + t.amount, 0)
-      const exp = transactions.filter(t => t.type === 'expense' && t.date.startsWith(k)).reduce((s, t) => s + t.amount, 0)
+      const txK = transactions.filter(t => t.date.startsWith(k))
+      const inc = txK.filter(t => t.type === 'income').reduce((s, t) => s + convert(t.amount, t.currency ?? currency, currency), 0)
+      const exp = txK.filter(t => t.type === 'expense').reduce((s, t) => s + convert(t.amount, t.currency ?? currency, currency), 0)
       return { label: MONTHS_SHORT[d.getMonth()], balance: inc - exp, inc, exp, hasData: inc + exp > 0 }
     })
-  }, [transactions, yr, mo])
+  }, [transactions, yr, mo, currency])
 
   const yearMonths = useMemo(() => {
     const now = new Date()
     return Array.from({ length: 12 }, (_, m) => {
       const d = new Date(yr, m, 1)
       const k = mkKey(d)
-      const inc = transactions.filter(t => t.type === 'income' && t.date.startsWith(k)).reduce((s, t) => s + t.amount, 0)
-      const exp = transactions.filter(t => t.type === 'expense' && t.date.startsWith(k)).reduce((s, t) => s + t.amount, 0)
+      const txK = transactions.filter(t => t.date.startsWith(k))
+      const inc = txK.filter(t => t.type === 'income').reduce((s, t) => s + convert(t.amount, t.currency ?? currency, currency), 0)
+      const exp = txK.filter(t => t.type === 'expense').reduce((s, t) => s + convert(t.amount, t.currency ?? currency, currency), 0)
       return { inc, exp, net: inc - exp, isFuture: d > now }
     })
-  }, [transactions, yr])
+  }, [transactions, yr, currency])
 
   const yearSummary = useMemo(() => {
     const inc = yearMonths.reduce((s, m) => s + m.inc, 0)
@@ -117,14 +120,14 @@ export default function DashboardScreen({ transactions, budgets, onDeleteTx, cur
         <View style={[st.balDivider, { backgroundColor: C.border }]} />
         <View style={st.balRow}>
           <View style={st.balItem}>
-            <Text style={[st.balItemLabel, { color: C.text2 }]}>↑ Revenus</Text>
+            <Text style={[st.balItemLabel, { color: C.text2 }]}>↑ Entrées</Text>
             <Text style={[st.balItemVal, { color: C.green }]}>
               {fmt(viewMode === 'year' ? yearSummary.inc : monthData.inc, currency)}
             </Text>
           </View>
           <View style={[st.balSep, { backgroundColor: C.border }]} />
           <View style={st.balItem}>
-            <Text style={[st.balItemLabel, { color: C.text2 }]}>↓ Dépenses</Text>
+            <Text style={[st.balItemLabel, { color: C.text2 }]}>↓ Sorties</Text>
             <Text style={[st.balItemVal, { color: C.red }]}>
               {fmt(viewMode === 'year' ? yearSummary.exp : monthData.exp, currency)}
             </Text>
@@ -134,8 +137,8 @@ export default function DashboardScreen({ transactions, budgets, onDeleteTx, cur
 
       {/* Stats row */}
       <View style={st.statsRow}>
-        <StatCard label="Moy. revenus" value={fmtShort(Math.round(avgData.inc), currency)} color={C.green} C={C} />
-        <StatCard label="Moy. dépenses" value={fmtShort(Math.round(avgData.exp), currency)} color={C.red} C={C} />
+        <StatCard label="Moy. entrées" value={fmtShort(Math.round(avgData.inc), currency)} color={C.green} C={C} />
+        <StatCard label="Moy. sorties" value={fmtShort(Math.round(avgData.exp), currency)} color={C.red} C={C} />
         <StatCard label="Transactions" value={String(transactions.length)} color={C.primary} C={C} />
       </View>
 
@@ -192,7 +195,7 @@ export default function DashboardScreen({ transactions, budgets, onDeleteTx, cur
           )}
 
           {/* Top dépenses */}
-          <SectionTitle title="Top dépenses du mois" C={C} />
+          <SectionTitle title="Top sorties du mois" C={C} />
           <View style={[st.card, { backgroundColor: C.surface, borderColor: C.border }]}>
             {topExpenses.length === 0 ? (
               <Text style={[st.empty, { color: C.text2 }]}>Aucune dépense ce mois</Text>
@@ -241,7 +244,7 @@ function ProjectionTable({ projection, C, currency }: { projection: { label: str
       <SectionTitle title="🔮 Prévisions" C={C} />
       <View style={[st.card, { backgroundColor: C.surface, borderColor: C.border }]}>
         <View style={[st.projHead, { borderBottomColor: C.border }]}>
-          {['Mois', 'Revenus', 'Dépenses', 'Net'].map((h, i) => (
+          {['Mois', 'Entrées', 'Sorties', 'Net'].map((h, i) => (
             <Text key={h} style={[st.projHeadCell, { color: C.text2, textAlign: i === 0 ? 'left' : 'right' }]}>{h}</Text>
           ))}
         </View>

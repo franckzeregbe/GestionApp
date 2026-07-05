@@ -1,32 +1,58 @@
 export const CATEGORIES = {
-  income: ['Salaire', 'Entreprise', 'Autre revenu'],
+  income: [
+    'Salaire', 'Freelance', 'Business', 'Vente', 'Investissement',
+    'Loyer perçu', 'Remboursement', 'Cadeau reçu', 'Prime', 'Pension',
+    'Bourse', 'Dividende', 'Autre revenu',
+  ],
   expense: [
-    'Facture électricité', 'Loyer', 'Internet',
-    'Financement voiture', 'Assurance voiture', 'Carburant voiture',
-    'Assurance habitation', 'Carte de crédit CIBC', 'Carte de crédit Scotia',
-    'Ligne de crédit', 'Épicerie', 'Garderie', 'Autres', 'Imprévus', 'Épargne',
+    // Logement
+    'Loyer', 'Hypothèque', 'Électricité', 'Eau', 'Gaz', 'Internet', 'Téléphone',
+    // Alimentation
+    'Épicerie', 'Restaurant', 'Café',
+    // Transport
+    'Carburant', 'Transport en commun', 'Taxi / VTC', 'Entretien véhicule', 'Assurance auto',
+    // Santé
+    'Médecin', 'Pharmacie', 'Sport / Fitness', 'Bien-être',
+    // Loisirs
+    'Sorties', 'Voyage', 'Streaming', 'Jeux', 'Livres / Formation',
+    // Shopping
+    'Vêtements', 'Électronique', 'Maison / Déco',
+    // Finance
+    'Épargne', 'Investissement', 'Crédit', 'Assurance', 'Impôts / Taxes',
+    // Famille
+    'Enfants', 'Animaux', 'Cadeaux',
+    // Divers
+    'Abonnements', 'Imprévus', 'Autres',
   ],
 }
 
 export const ICONS: Record<string, string> = {
-  Salaire: '💼',
-  Entreprise: '🏢',
-  'Autre revenu': '💵',
-  'Facture électricité': '⚡',
-  Loyer: '🏠',
-  Internet: '🌐',
-  'Financement voiture': '🚗',
-  'Assurance voiture': '🛡️',
-  'Carburant voiture': '⛽',
-  'Assurance habitation': '🏘️',
-  'Carte de crédit CIBC': '💳',
-  'Carte de crédit Scotia': '💳',
-  'Ligne de crédit': '🏦',
-  Épicerie: '🛒',
-  Garderie: '👶',
-  Autres: '📦',
-  Imprévus: '⚠️',
-  Épargne: '🐷',
+  // Revenus
+  Salaire: '💼', Freelance: '💻', Business: '🏢', Vente: '🏷️',
+  Investissement: '📈', 'Loyer perçu': '🏠', Remboursement: '↩️',
+  'Cadeau reçu': '🎁', Prime: '🏆', Pension: '👴', Bourse: '📊',
+  Dividende: '💹', 'Autre revenu': '💵',
+  // Logement
+  Loyer: '🏠', Hypothèque: '🏦', Électricité: '⚡', Eau: '💧',
+  Gaz: '🔥', Internet: '🌐', Téléphone: '📱',
+  // Alimentation
+  Épicerie: '🛒', Restaurant: '🍽️', Café: '☕',
+  // Transport
+  Carburant: '⛽', 'Transport en commun': '🚌', 'Taxi / VTC': '🚕',
+  'Entretien véhicule': '🔧', 'Assurance auto': '🛡️',
+  // Santé
+  Médecin: '🏥', Pharmacie: '💊', 'Sport / Fitness': '🏋️', 'Bien-être': '🧘',
+  // Loisirs
+  Sorties: '🎉', Voyage: '✈️', Streaming: '📺', Jeux: '🎮',
+  'Livres / Formation': '📚',
+  // Shopping
+  Vêtements: '👕', Électronique: '🖥️', 'Maison / Déco': '🛋️',
+  // Finance
+  Épargne: '🐷', Crédit: '💳', Assurance: '🛡️', 'Impôts / Taxes': '🏛️',
+  // Famille
+  Enfants: '👶', Animaux: '🐾', Cadeaux: '🎁',
+  // Divers
+  Abonnements: '🔄', Imprévus: '⚠️', Autres: '📦',
 }
 
 export const MONTHS_FR = [

@@ -4,9 +4,10 @@ import {
   Modal, Animated, Alert, StyleSheet, Dimensions, Pressable,
 } from 'react-native'
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { type Transaction, type CurrencyId } from '../types'
 import { ICONS, MONTHS_SHORT } from '../utils/constants'
-import { fmt } from '../utils/currency'
+import { fmt, convert } from '../utils/currency'
 import { COLORS } from '../theme'
 
 const { height: SH } = Dimensions.get('window')
@@ -19,6 +20,8 @@ interface Props {
   currency: CurrencyId
 }
 
+type Filter = 'all' | 'income' | 'expense'
+
 function fmtDate(s: string): string {
   try {
     const [, m, d] = s.split('-')
@@ -28,19 +31,32 @@ function fmtDate(s: string): string {
 
 export default function TransactionsScreen({ transactions, onDeleteTx, onEditTransaction, theme, currency }: Props) {
   const C = COLORS[theme]
+  const insets = useSafeAreaInsets()
   const slide = useRef(new Animated.Value(SH)).current
   const tabBarHeight = useBottomTabBarHeight()
   const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<Filter>('all')
   const [actionTx, setActionTx] = useState<Transaction | null>(null)
   const [showAction, setShowAction] = useState(false)
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return [...transactions].reverse()
-    return [...transactions].reverse().filter(t =>
-      t.category.toLowerCase().includes(q) || t.note.toLowerCase().includes(q)
-    )
-  }, [transactions, search])
+    return [...transactions]
+      .reverse()
+      .filter(t => {
+        if (filter === 'income' && t.type !== 'income') return false
+        if (filter === 'expense' && t.type !== 'expense') return false
+        if (!q) return true
+        return t.category.toLowerCase().includes(q) || t.note.toLowerCase().includes(q)
+      })
+  }, [transactions, search, filter])
+
+  // Totaux convertis dans la devise d'affichage
+  const totals = useMemo(() => {
+    const inc = transactions.filter(t => t.type === 'income').reduce((s, t) => s + convert(t.amount, t.currency ?? currency, currency), 0)
+    const exp = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + convert(t.amount, t.currency ?? currency, currency), 0)
+    return { inc, exp, net: inc - exp }
+  }, [transactions, currency])
 
   const openAction = useCallback((tx: Transaction) => {
     setActionTx(tx)
@@ -65,13 +81,13 @@ export default function TransactionsScreen({ transactions, onDeleteTx, onEditTra
   const handleDelete = useCallback(() => {
     const tx = actionTx
     if (!tx) return
-    Alert.alert('Supprimer ?', `"${tx.category}" — ${fmt(tx.amount, currency)}`, [
+    Alert.alert('Supprimer ?', `"${tx.category}" — ${fmt(convert(tx.amount, tx.currency ?? currency, currency), currency)}`, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: () => { onDeleteTx(tx.id); closeAction() } },
     ])
   }, [actionTx, onDeleteTx, closeAction, currency])
 
-  const renderItem = useCallback(({ item, index }: { item: Transaction; index: number }) => {
+  const renderItem = useCallback(({ item }: { item: Transaction }) => {
     const isIncome = item.type === 'income'
     const color = isIncome ? C.green : C.red
     return (
@@ -88,30 +104,76 @@ export default function TransactionsScreen({ transactions, onDeleteTx, onEditTra
           {item.note ? <Text style={[st.itemNote, { color: C.text2 }]} numberOfLines={1}>{item.note}</Text> : null}
         </View>
         <View style={st.itemRight}>
-          <Text style={[st.itemAmt, { color }]}>{isIncome ? '+' : '−'} {fmt(item.amount, currency)}</Text>
+          <Text style={[st.itemAmt, { color }]}>{isIncome ? '+' : '−'} {fmt(convert(item.amount, item.currency ?? currency, currency), currency)}</Text>
           <Text style={[st.itemDate, { color: C.text2 }]}>{fmtDate(item.date)}</Text>
         </View>
       </TouchableOpacity>
     )
   }, [C, currency, openAction])
 
+  const FILTERS: { key: Filter; label: string }[] = [
+    { key: 'all', label: 'Tout' },
+    { key: 'income', label: '↑ Entrées' },
+    { key: 'expense', label: '↓ Sorties' },
+  ]
+
   return (
     <View style={[st.container, { backgroundColor: C.bg }]}>
-      {/* Search */}
-      <View style={[st.searchWrap, { backgroundColor: C.surface, borderColor: C.border }]}>
-        <Text style={[st.searchIcon, { color: C.text2 }]}>🔍</Text>
-        <TextInput
-          style={[st.searchInput, { color: C.text }]}
-          placeholder="Rechercher..."
-          placeholderTextColor={C.text2}
-          value={search}
-          onChangeText={setSearch}
-          returnKeyType="search"
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={[st.searchClear, { color: C.text2 }]}>✕</Text>
+
+      {/* Résumé global */}
+      {transactions.length > 0 && (
+        <View style={[st.summary, { backgroundColor: C.surface, borderColor: C.border }]}>
+          <View style={st.summaryItem}>
+            <Text style={[st.summaryLabel, { color: C.text2 }]}>Entrées</Text>
+            <Text style={[st.summaryVal, { color: C.green }]}>{fmt(totals.inc, currency)}</Text>
+          </View>
+          <View style={[st.summarySep, { backgroundColor: C.border }]} />
+          <View style={st.summaryItem}>
+            <Text style={[st.summaryLabel, { color: C.text2 }]}>Sorties</Text>
+            <Text style={[st.summaryVal, { color: C.red }]}>{fmt(totals.exp, currency)}</Text>
+          </View>
+          <View style={[st.summarySep, { backgroundColor: C.border }]} />
+          <View style={st.summaryItem}>
+            <Text style={[st.summaryLabel, { color: C.text2 }]}>Net</Text>
+            <Text style={[st.summaryVal, { color: totals.net >= 0 ? C.green : C.red }]}>{fmt(totals.net, currency)}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Barre recherche + filtres */}
+      <View style={st.searchRow}>
+        <View style={[st.searchWrap, { backgroundColor: C.surface, borderColor: C.border, flex: 1 }]}>
+          <Text style={[st.searchIcon, { color: C.text2 }]}>🔍</Text>
+          <TextInput
+            style={[st.searchInput, { color: C.text }]}
+            placeholder="Rechercher..."
+            placeholderTextColor={C.text2}
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={[st.searchClear, { color: C.text2 }]}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Filtres type */}
+      <View style={st.filterRow}>
+        {FILTERS.map(f => (
+          <TouchableOpacity
+            key={f.key}
+            style={[st.filterBtn, { backgroundColor: filter === f.key ? C.primary : C.surface, borderColor: filter === f.key ? C.primary : C.border }]}
+            onPress={() => setFilter(f.key)}
+            activeOpacity={0.7}
+          >
+            <Text style={[st.filterText, { color: filter === f.key ? '#fff' : C.text2 }]}>{f.label}</Text>
           </TouchableOpacity>
+        ))}
+        {filtered.length > 0 && (
+          <Text style={[st.countText, { color: C.text2 }]}>{filtered.length} opération{filtered.length > 1 ? 's' : ''}</Text>
         )}
       </View>
 
@@ -119,7 +181,7 @@ export default function TransactionsScreen({ transactions, onDeleteTx, onEditTra
         <View style={st.empty}>
           <Text style={{ fontSize: 44, marginBottom: 12 }}>📭</Text>
           <Text style={[st.emptyText, { color: C.text2 }]}>
-            {search ? 'Aucun résultat' : 'Aucune transaction'}
+            {search ? 'Aucun résultat' : 'Aucune opération'}
           </Text>
         </View>
       ) : (
@@ -139,7 +201,7 @@ export default function TransactionsScreen({ transactions, onDeleteTx, onEditTra
           <Pressable style={StyleSheet.absoluteFill} onPress={() => closeAction()} />
           <Animated.View
             onStartShouldSetResponder={() => true}
-            style={[st.sheet, { backgroundColor: C.surface, borderColor: C.border }, { transform: [{ translateY: slide }] }]}
+            style={[st.sheet, { backgroundColor: C.surface, borderColor: C.border, paddingBottom: insets.bottom + 16 }, { transform: [{ translateY: slide }] }]}
           >
             <View style={[st.handle, { backgroundColor: C.border }]} />
             {actionTx && (
@@ -150,12 +212,13 @@ export default function TransactionsScreen({ transactions, onDeleteTx, onEditTra
                 <View style={{ flex: 1 }}>
                   <Text style={[st.sheetCat, { color: C.text }]}>{actionTx.category}</Text>
                   <Text style={[st.sheetAmt, { color: actionTx.type === 'income' ? C.green : C.red }]}>
-                    {actionTx.type === 'income' ? '+' : '−'} {fmt(actionTx.amount, currency)}
+                    {actionTx.type === 'income' ? '+' : '−'} {fmt(convert(actionTx.amount, actionTx.currency ?? currency, currency), currency)}
                   </Text>
+                  {actionTx.note ? <Text style={[st.sheetNote, { color: C.text2 }]}>{actionTx.note}</Text> : null}
                 </View>
                 <View style={[st.badge, { backgroundColor: actionTx.type === 'income' ? C.greenSoft : C.redSoft }]}>
                   <Text style={[st.badgeText, { color: actionTx.type === 'income' ? C.green : C.red }]}>
-                    {actionTx.type === 'income' ? 'Revenu' : 'Dépense'}
+                    {actionTx.type === 'income' ? 'Entrée' : 'Sortie'}
                   </Text>
                 </View>
               </View>
@@ -180,15 +243,30 @@ export default function TransactionsScreen({ transactions, onDeleteTx, onEditTra
 
 const st = StyleSheet.create({
   container: { flex: 1 },
+  summary: {
+    flexDirection: 'row', marginHorizontal: 16, marginTop: 12, marginBottom: 4,
+    borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, padding: 12,
+  },
+  summaryItem: { flex: 1, alignItems: 'center' },
+  summaryLabel: { fontSize: 11, fontWeight: '500', marginBottom: 2 },
+  summaryVal: { fontSize: 14, fontWeight: '700' },
+  summarySep: { width: StyleSheet.hairlineWidth, marginVertical: 4 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 8, marginBottom: 6 },
   searchWrap: {
     flexDirection: 'row', alignItems: 'center',
-    marginHorizontal: 16, marginTop: 12, marginBottom: 8,
     paddingHorizontal: 12, paddingVertical: 10,
     borderRadius: 14, borderWidth: StyleSheet.hairlineWidth,
   },
   searchIcon: { fontSize: 14, marginRight: 8 },
   searchInput: { flex: 1, fontSize: 15 },
   searchClear: { fontSize: 13, paddingLeft: 8 },
+  filterRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, marginBottom: 8 },
+  filterBtn: {
+    paddingHorizontal: 14, paddingVertical: 7,
+    borderRadius: 20, borderWidth: StyleSheet.hairlineWidth,
+  },
+  filterText: { fontSize: 13, fontWeight: '600' },
+  countText: { fontSize: 12, marginLeft: 'auto' },
   list: { paddingHorizontal: 16, paddingBottom: 16 },
   item: {
     flexDirection: 'row', alignItems: 'center',
@@ -207,7 +285,7 @@ const st = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   sheet: {
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    borderWidth: StyleSheet.hairlineWidth, paddingBottom: 32,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 4 },
   sheetHeader: {
@@ -218,6 +296,7 @@ const st = StyleSheet.create({
   sheetIconWrap: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   sheetCat: { fontSize: 16, fontWeight: '700' },
   sheetAmt: { fontSize: 14, fontWeight: '600', marginTop: 2 },
+  sheetNote: { fontSize: 12, marginTop: 3 },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   badgeText: { fontSize: 12, fontWeight: '600' },
   sheetBtn: { paddingVertical: 16, paddingHorizontal: 20 },

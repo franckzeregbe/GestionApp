@@ -5,9 +5,10 @@ import {
   KeyboardAvoidingView, Platform, Pressable,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { type Transaction } from '../types'
+import { type Transaction, type CurrencyId } from '../types'
 import { CATEGORIES } from '../utils/constants'
 import { COLORS } from '../theme'
+import { CURRENCIES as CUR } from '../utils/currency'
 import CategoryPicker from './CategoryPicker'
 
 const { height: SH } = Dimensions.get('window')
@@ -15,6 +16,7 @@ const { height: SH } = Dimensions.get('window')
 interface FormState {
   type: 'income' | 'expense'
   category: string
+  customCategory: string
   amount: string
   date: string
   note: string
@@ -26,23 +28,37 @@ interface Props {
   visible: boolean
   editTx: Transaction | null
   theme: 'dark' | 'light'
+  currency: CurrencyId
   onSave: (tx: Omit<Transaction, 'id'>) => void
   onEdit: (id: number, tx: Omit<Transaction, 'id'>) => void
   onClose: () => void
 }
 
-export default function TransactionForm({ visible, editTx, theme, onSave, onEdit, onClose }: Props) {
+export default function TransactionForm({ visible, editTx, theme, currency, onSave, onEdit, onClose }: Props) {
   const C = COLORS[theme]
   const insets = useSafeAreaInsets()
   const slide = useRef(new Animated.Value(SH)).current
-  const [form, setForm] = useState<FormState>({ type: 'expense', category: '', amount: '', date: today(), note: '' })
+  const [form, setForm] = useState<FormState>({
+    type: 'expense', category: '', customCategory: '', amount: '', date: today(), note: '',
+  })
+  const [showSuggestions, setShowSuggestions] = useState(true)
 
   useEffect(() => {
     if (!visible) return
-    setForm(editTx
-      ? { type: editTx.type, category: editTx.category, amount: String(editTx.amount), date: editTx.date, note: editTx.note }
-      : { type: 'expense', category: '', amount: '', date: today(), note: '' }
-    )
+    if (editTx) {
+      setForm({
+        type: editTx.type,
+        category: editTx.category,
+        customCategory: editTx.category,
+        amount: String(editTx.amount),
+        date: editTx.date,
+        note: editTx.note,
+      })
+      setShowSuggestions(false)
+    } else {
+      setForm({ type: 'expense', category: '', customCategory: '', amount: '', date: today(), note: '' })
+      setShowSuggestions(true)
+    }
     slide.setValue(SH)
     Animated.spring(slide, { toValue: 0, useNativeDriver: true, damping: 24, stiffness: 240 }).start()
   }, [visible, editTx])
@@ -53,15 +69,27 @@ export default function TransactionForm({ visible, editTx, theme, onSave, onEdit
 
   const submit = useCallback(() => {
     const amount = parseFloat(form.amount.replace(',', '.'))
-    if (!form.category) { Alert.alert('Catégorie manquante', 'Veuillez sélectionner une catégorie.'); return }
+    const finalCategory = form.category.trim() || form.customCategory.trim()
+    if (!finalCategory) { Alert.alert('Catégorie manquante', 'Veuillez saisir une catégorie.'); return }
     if (isNaN(amount) || amount <= 0) { Alert.alert('Montant invalide', 'Entrez un montant supérieur à 0.'); return }
-    const tx: Omit<Transaction, 'id'> = { type: form.type, category: form.category, amount, date: form.date, note: form.note }
+    const txCurrency = editTx?.currency ?? currency
+    const tx: Omit<Transaction, 'id'> = { type: form.type, category: finalCategory, amount, currency: txCurrency, date: form.date, note: form.note }
     if (editTx) onEdit(editTx.id, tx)
     else onSave(tx)
     Animated.timing(slide, { toValue: SH, duration: 200, useNativeDriver: true }).start(onClose)
-  }, [form, editTx, onSave, onEdit, onClose])
+  }, [form, useCustom, editTx, onSave, onEdit, onClose])
 
   const set = (k: keyof FormState) => (v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  const switchType = (t: 'income' | 'expense') => {
+    setForm(f => ({ ...f, type: t, category: '', customCategory: '' }))
+    setShowSuggestions(true)
+  }
+
+  const selectCategory = (cat: string) => {
+    setForm(f => ({ ...f, category: cat, customCategory: cat }))
+    setShowSuggestions(false)
+  }
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={close}>
@@ -78,7 +106,7 @@ export default function TransactionForm({ visible, editTx, theme, onSave, onEdit
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               bounces={false}
-              contentContainerStyle={{ paddingBottom: insets.bottom + 8 }}
+              contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
             >
               {/* Titre */}
               <View style={s.titleRow}>
@@ -95,15 +123,12 @@ export default function TransactionForm({ visible, editTx, theme, onSave, onEdit
                 {(['expense', 'income'] as const).map(t => (
                   <TouchableOpacity
                     key={t}
-                    style={[
-                      s.typeBtn,
-                      form.type === t && { backgroundColor: t === 'income' ? C.green : C.red },
-                    ]}
-                    onPress={() => setForm(f => ({ ...f, type: t, category: '' }))}
+                    style={[s.typeBtn, form.type === t && { backgroundColor: t === 'income' ? C.green : C.red }]}
+                    onPress={() => switchType(t)}
                     activeOpacity={0.8}
                   >
                     <Text style={[s.typeBtnText, { color: form.type === t ? '#fff' : C.text2 }]}>
-                      {t === 'income' ? '💰  Revenu' : '💸  Dépense'}
+                      {t === 'income' ? '💰  Entrée' : '💸  Sortie'}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -111,24 +136,48 @@ export default function TransactionForm({ visible, editTx, theme, onSave, onEdit
 
               {/* Catégorie */}
               <Text style={[s.label, { color: C.text2 }]}>Catégorie</Text>
-              <CategoryPicker
-                categories={CATEGORIES[form.type]}
-                selected={form.category}
-                onSelect={set('category')}
-                theme={theme}
+              <TextInput
+                style={[s.input, { backgroundColor: C.surface2, color: C.text, borderColor: C.border }]}
+                placeholder="Ex: Salaire, Loyer, Épicerie..."
+                placeholderTextColor={C.text2}
+                value={form.customCategory || form.category}
+                onChangeText={v => setForm(f => ({ ...f, customCategory: v, category: v }))}
+                returnKeyType="done"
               />
+              {showSuggestions && CATEGORIES[form.type].length > 0 && (
+                <View style={s.suggestionsWrap}>
+                  <Text style={[s.suggestionsLabel, { color: C.text2 }]}>Suggestions :</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
+                    {CATEGORIES[form.type].map(cat => (
+                      <TouchableOpacity
+                        key={cat}
+                        style={[s.chip, { backgroundColor: C.surface, borderColor: C.border }]}
+                        onPress={() => selectCategory(cat)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[s.chipText, { color: C.text }]}>{cat}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
 
               {/* Montant */}
               <Text style={[s.label, { color: C.text2 }]}>Montant</Text>
-              <TextInput
-                style={[s.input, { backgroundColor: C.surface2, color: C.text, borderColor: C.border }]}
-                placeholder="0.00"
-                placeholderTextColor={C.text2}
-                keyboardType="decimal-pad"
-                value={form.amount}
-                onChangeText={set('amount')}
-                returnKeyType="done"
-              />
+              <View style={[s.amountRow, { backgroundColor: C.surface2, borderColor: C.border }]}>
+                <Text style={[s.currencyBadge, { color: C.primary }]}>
+                  {CUR[editTx?.currency ?? currency].label}
+                </Text>
+                <TextInput
+                  style={[s.amountInput, { color: C.text }]}
+                  placeholder="0.00"
+                  placeholderTextColor={C.text2}
+                  keyboardType="decimal-pad"
+                  value={form.amount}
+                  onChangeText={set('amount')}
+                  returnKeyType="done"
+                />
+              </View>
 
               {/* Date */}
               <Text style={[s.label, { color: C.text2 }]}>Date</Text>
@@ -142,7 +191,9 @@ export default function TransactionForm({ visible, editTx, theme, onSave, onEdit
               />
 
               {/* Note */}
-              <Text style={[s.label, { color: C.text2 }]}>Note <Text style={{ fontWeight: '400' }}>(optionnelle)</Text></Text>
+              <Text style={[s.label, { color: C.text2 }]}>
+                Note <Text style={{ fontWeight: '400' }}>(optionnelle)</Text>
+              </Text>
               <TextInput
                 style={[s.input, s.noteInput, { backgroundColor: C.surface2, color: C.text, borderColor: C.border }]}
                 placeholder="Ajouter une note..."
@@ -159,7 +210,7 @@ export default function TransactionForm({ visible, editTx, theme, onSave, onEdit
                 onPress={submit}
                 activeOpacity={0.85}
               >
-                <Text style={s.submitText}>{editTx ? 'Enregistrer les modifications' : 'Ajouter la transaction'}</Text>
+                <Text style={s.submitText}>{editTx ? 'Enregistrer les modifications' : 'Ajouter'}</Text>
               </TouchableOpacity>
             </ScrollView>
           </Animated.View>
@@ -186,10 +237,31 @@ const s = StyleSheet.create({
   typeBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   typeBtnText: { fontSize: 14, fontWeight: '600' },
   label: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
+  suggestionsWrap: { marginBottom: 16 },
+  suggestionsLabel: { fontSize: 11, marginBottom: 6 },
+  chipsRow: { flexDirection: 'row', gap: 6, paddingVertical: 2 },
+  chip: {
+    paddingHorizontal: 12, paddingVertical: 7,
+    borderRadius: 16, borderWidth: StyleSheet.hairlineWidth,
+  },
+  chipText: { fontSize: 13, fontWeight: '500' },
   input: {
     paddingHorizontal: 14, paddingVertical: 13,
     borderRadius: 12, borderWidth: StyleSheet.hairlineWidth,
     fontSize: 16, marginBottom: 16,
+  },
+  amountRow: {
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: 12, borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 16, overflow: 'hidden',
+  },
+  currencyBadge: {
+    paddingHorizontal: 14, paddingVertical: 13,
+    fontSize: 14, fontWeight: '700',
+    borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: 'rgba(128,128,128,0.3)',
+  },
+  amountInput: {
+    flex: 1, paddingHorizontal: 14, paddingVertical: 13, fontSize: 16,
   },
   noteInput: { minHeight: 72, textAlignVertical: 'top' },
   submitBtn: { paddingVertical: 15, borderRadius: 14, alignItems: 'center', marginTop: 4, marginBottom: 8 },

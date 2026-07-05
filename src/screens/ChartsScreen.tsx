@@ -5,7 +5,7 @@ import Svg, { Path, G, Rect, Line, Circle, Polyline, Polygon, Text as SvgText } 
 import { type Transaction, type CurrencyId } from '../types'
 import { COLORS, CHART_COLORS } from '../theme'
 import { MONTHS_SHORT } from '../utils/constants'
-import { fmt, fmtShort, mkKey, parseDate } from '../utils/currency'
+import { fmt, fmtShort, convert, mkKey, parseDate } from '../utils/currency'
 
 interface Props {
   transactions: Transaction[]
@@ -44,21 +44,22 @@ export default function ChartsScreen({ transactions, theme, currentMonth, curren
     const mk = mkKey(currentMonth)
     const filtered = transactions.filter(t => t.type === 'expense' && mkKey(parseDate(t.date)) === mk)
     const groups: Record<string, number> = {}
-    filtered.forEach(t => { groups[t.category] = (groups[t.category] || 0) + t.amount })
+    filtered.forEach(t => { groups[t.category] = (groups[t.category] || 0) + convert(t.amount, t.currency ?? currency, currency) })
     const entries = Object.entries(groups).sort((a, b) => b[1] - a[1])
     const total = entries.reduce((s, [, v]) => s + v, 0)
     return { entries, total, hasData: total > 0 }
-  }, [transactions, currentMonth])
+  }, [transactions, currentMonth, currency])
 
   const months = useMemo(() => getAllMonths(12, currentMonth), [currentMonth])
 
   const monthlyData = useMemo(() => {
     return months.map(m => {
-      const inc = transactions.filter(t => t.type === 'income' && mkKey(parseDate(t.date)) === m.key).reduce((s, t) => s + t.amount, 0)
-      const exp = transactions.filter(t => t.type === 'expense' && mkKey(parseDate(t.date)) === m.key).reduce((s, t) => s + t.amount, 0)
+      const txM = transactions.filter(t => mkKey(parseDate(t.date)) === m.key)
+      const inc = txM.filter(t => t.type === 'income').reduce((s, t) => s + convert(t.amount, t.currency ?? currency, currency), 0)
+      const exp = txM.filter(t => t.type === 'expense').reduce((s, t) => s + convert(t.amount, t.currency ?? currency, currency), 0)
       return { ...m, inc, exp }
     })
-  }, [transactions, months])
+  }, [transactions, months, currency])
 
   const lineData = useMemo(() => {
     let bal = 0
@@ -122,7 +123,7 @@ export default function ChartsScreen({ transactions, theme, currentMonth, curren
       <ScrollView style={[s.container, { backgroundColor: c.bg }]} contentContainerStyle={[s.content, { paddingBottom: tabBarHeight + 16 }]}>
           {/* 1. Donut */}
           <View style={[s.card, { backgroundColor: c.surface }]}>
-            <Text style={[s.cardTitle, { color: c.text }]}>Répartition des dépenses</Text>
+            <Text style={[s.cardTitle, { color: c.text }]}>Répartition des sorties</Text>
             {donutData.hasData ? (
               <View style={s.donutWrap}>
                 <Svg width={DONUT_SIZE} height={DONUT_SIZE}>
@@ -147,8 +148,8 @@ export default function ChartsScreen({ transactions, theme, currentMonth, curren
                 </View>
               </View>
             ) : (
-              <View style={[s.empty, { height: DONUT_SIZE }]}>
-                <Text style={[s.emptyText, { color: c.text2 }]}>Aucune dépense</Text>
+              <View style={s.empty}>
+                <Text style={[s.emptyText, { color: c.text2 }]}>Aucune sortie ce mois</Text>
               </View>
             )}
           </View>
@@ -156,7 +157,7 @@ export default function ChartsScreen({ transactions, theme, currentMonth, curren
           {/* 2. Bar Chart */}
           <View style={[s.card, { backgroundColor: c.surface }]}>
             <View style={s.chartHeader}>
-              <Text style={[s.cardTitle, { color: c.text, marginBottom: 0 }]}>Revenus vs Dépenses (12 mois)</Text>
+              <Text style={[s.cardTitle, { color: c.text, marginBottom: 0 }]}>Entrées vs Sorties (12 mois)</Text>
               <View style={s.headerLegend}>
                 <View style={[s.legendDot, { backgroundColor: c.green }]} />
                 <Text style={[s.legendLabel, { color: c.text2 }]}>R</Text>
