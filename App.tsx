@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { StatusBar } from 'expo-status-bar'
-import { View, StyleSheet, TouchableOpacity, Text, Platform } from 'react-native'
+import { View, StyleSheet, TouchableOpacity, Text, Platform, Alert } from 'react-native'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { NavigationContainer } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
@@ -14,6 +14,9 @@ import { COLORS } from './src/theme'
 import { MONTHS_FR } from './src/utils/constants'
 import type { Transaction, Budgets, CurrencyId } from './src/types'
 import { loadTransactions, saveTransactions, loadBudgets, saveBudgets } from './src/storage'
+import * as FileSystem from 'expo-file-system'
+import * as Sharing from 'expo-sharing'
+import * as Clipboard from 'expo-clipboard'
 
 const Tab = createBottomTabNavigator()
 
@@ -88,6 +91,15 @@ function AppContent() {
     })
   }, [])
 
+  const handleDeleteBudget = useCallback((cat: string) => {
+    setBudgets(prev => {
+      const next = { ...prev }
+      delete next[cat]
+      saveBudgets(next)
+      return next
+    })
+  }, [])
+
   const toggleTheme = useCallback(async () => {
     const next = theme === 'dark' ? 'light' : 'dark'
     setTheme(next)
@@ -120,6 +132,56 @@ function AppContent() {
     setEditingTx(null)
   }, [])
 
+  const handleExport = useCallback(async () => {
+    try {
+      const data = { transactions, budgets, exported: new Date().toISOString() }
+      const json = JSON.stringify(data, null, 2)
+      const fileName = `gestion_${new Date().toISOString().slice(0, 10)}.json`
+      const fileUri = FileSystem.documentDirectory + fileName
+      await FileSystem.writeAsStringAsync(fileUri, json)
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, { mimeType: 'application/json', dialogTitle: 'Exporter Gestion' })
+      } else {
+        await Clipboard.setStringAsync(json)
+        Alert.alert('Copié', 'Données copiées dans le presse-papier')
+      }
+    } catch { Alert.alert('Erreur', "Échec de l'export") }
+  }, [transactions, budgets])
+
+  const handleImport = useCallback(async () => {
+    try {
+      const json = await Clipboard.getStringAsync()
+      if (!json || !json.startsWith('{')) {
+        Alert.alert('Presse-papier vide', 'Copiez d\'abord un fichier JSON de données')
+        return
+      }
+      const data = JSON.parse(json)
+      if (data.transactions) {
+        setTransactions(data.transactions)
+        saveTransactions(data.transactions)
+      }
+      if (data.budgets) {
+        setBudgets(data.budgets)
+        saveBudgets(data.budgets)
+      }
+      Alert.alert('Importé', 'Données restaurées avec succès')
+    } catch {
+      Alert.alert('Erreur', 'Format de données invalide')
+    }
+  }, [])
+
+  const handleReset = useCallback(() => {
+    Alert.alert('Tout effacer', 'Supprimer toutes les données ?', [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Supprimer', style: 'destructive', onPress: () => {
+        setTransactions([])
+        setBudgets({})
+        saveTransactions([])
+        saveBudgets({})
+      }},
+    ])
+  }, [])
+
   const isDash = activeTab === 'Dashboard'
   const monthLabel = viewMode === 'year'
     ? `${currentMonth.getFullYear()}`
@@ -147,9 +209,9 @@ function AppContent() {
   const renderBudgets = useCallback(() => (
     <BudgetsScreen
       transactions={transactions} budgets={budgets} onSaveBudget={handleSaveBudget}
-      currentMonth={currentMonth} theme={theme} currency={currency}
+      onDeleteBudget={handleDeleteBudget} currentMonth={currentMonth} theme={theme} currency={currency}
     />
-  ), [transactions, budgets, handleSaveBudget, currentMonth, theme, currency])
+  ), [transactions, budgets, handleSaveBudget, handleDeleteBudget, currentMonth, theme, currency])
 
   const TAB_H = 60
   const tabBarStyle = {
@@ -171,6 +233,15 @@ function AppContent() {
         <View style={styles.headerRow1}>
           <Text style={[styles.appTitle, { color: C.primary }]}>💰 Gestion</Text>
           <View style={styles.headerBtns}>
+            <TouchableOpacity onPress={handleExport} style={[styles.pill, { backgroundColor: C.surface2 }]}>
+              <Text style={styles.pillText}>📤</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleImport} style={[styles.pill, { backgroundColor: C.surface2 }]}>
+              <Text style={styles.pillText}>📥</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleReset} style={[styles.pill, { backgroundColor: C.surface2 }]}>
+              <Text style={styles.pillText}>🗑️</Text>
+            </TouchableOpacity>
             <TouchableOpacity onPress={toggleCurrency} style={[styles.pill, { backgroundColor: C.surface2 }]}>
               <Text style={[styles.pillText, { color: C.text2 }]}>{CURRENCY_LABELS[currency]}</Text>
             </TouchableOpacity>

@@ -23,6 +23,12 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": []
+    "plugins": [],
+    "extra": {
+      "eas": {
+        "projectId": "dad28e55-f561-4bcf-b2b3-d84f6eba4276"
+      }
+    },
+    "owner": "franckzeregbe"
   }
 }

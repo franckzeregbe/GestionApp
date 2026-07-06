@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react'
 import {
-  View, Text, ScrollView, Modal, TextInput, TouchableOpacity,
+  View, Text, ScrollView, Modal, TextInput, TouchableOpacity, Alert,
   StyleSheet, Animated, Dimensions, KeyboardAvoidingView, Platform, Pressable,
 } from 'react-native'
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs'
@@ -17,12 +17,13 @@ interface Props {
   transactions: Transaction[]
   budgets: Budgets
   onSaveBudget: (category: string, amount: number) => void
+  onDeleteBudget: (category: string) => void
   currentMonth: Date
   theme: 'dark' | 'light'
   currency: CurrencyId
 }
 
-export default function BudgetsScreen({ transactions, budgets, onSaveBudget, currentMonth, theme, currency }: Props) {
+export default function BudgetsScreen({ transactions, budgets, onSaveBudget, onDeleteBudget, currentMonth, theme, currency }: Props) {
   const C = COLORS[theme]
   const insets = useSafeAreaInsets()
   const monthKey = mkKey(currentMonth)
@@ -62,6 +63,17 @@ export default function BudgetsScreen({ transactions, budgets, onSaveBudget, cur
     setSelectedCat(allCategories[0] || CATEGORIES.expense[0])
     setAmountText('')
     setModalVisible(true)
+  }
+
+  const confirmDelete = (cat: string) => {
+    Alert.alert(
+      'Supprimer le budget',
+      `Supprimer le budget pour "${cat}" ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Supprimer', style: 'destructive', onPress: () => onDeleteBudget(cat) },
+      ]
+    )
   }
 
   const openEdit = (cat: string) => {
@@ -124,7 +136,7 @@ export default function BudgetsScreen({ transactions, budgets, onSaveBudget, cur
                 key={cat} category={cat} icon={ICONS[cat] || '📁'}
                 spent={spent} budget={budget} pct={pct}
                 barColor={barColor} C={C} currency={currency}
-                onPress={() => openEdit(cat)}
+                onEdit={() => openEdit(cat)} onDelete={() => confirmDelete(cat)}
               />
             )
           })}
@@ -189,9 +201,9 @@ export default function BudgetsScreen({ transactions, budgets, onSaveBudget, cur
   )
 }
 
-function BudgetCard({ category, icon, spent, budget, pct, barColor, C, currency, onPress }: {
+function BudgetCard({ category, icon, spent, budget, pct, barColor, C, currency, onEdit, onDelete }: {
   category: string; icon: string; spent: number; budget: number; pct: number
-  barColor: string; C: Record<string, string>; currency: CurrencyId; onPress: () => void
+  barColor: string; C: Record<string, string>; currency: CurrencyId; onEdit: () => void; onDelete: () => void
 }) {
   const widthAnim = useRef(new Animated.Value(0)).current
   useEffect(() => {
@@ -200,28 +212,38 @@ function BudgetCard({ category, icon, spent, budget, pct, barColor, C, currency,
 
   const remaining = budget - spent
   return (
-    <TouchableOpacity style={[st.card, { backgroundColor: C.surface, borderColor: C.border }]} onPress={onPress} activeOpacity={0.7}>
-      <View style={st.cardRow}>
-        <View style={[st.cardIconWrap, { backgroundColor: C.surface2 }]}>
-          <Text style={{ fontSize: 20 }}>{icon}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <View style={st.cardTop}>
-            <Text style={[st.cardCat, { color: C.text }]} numberOfLines={1}>{category}</Text>
-            <Text style={[st.cardPct, { color: pct >= 100 ? C.red : C.text2 }]}>{Math.round(pct)}%</Text>
+    <View style={[st.card, { backgroundColor: C.surface, borderColor: C.border }]}>
+      <TouchableOpacity onPress={onEdit} activeOpacity={0.7} style={{ flex: 1 }}>
+        <View style={st.cardRow}>
+          <View style={[st.cardIconWrap, { backgroundColor: C.surface2 }]}>
+            <Text style={{ fontSize: 20 }}>{icon}</Text>
           </View>
-          <Text style={[st.cardAmts, { color: C.text2 }]}>
-            {fmt(spent, currency)} <Text style={{ color: C.text2 }}>/ {fmt(budget, currency)}</Text>
-          </Text>
+          <View style={{ flex: 1 }}>
+            <View style={st.cardTop}>
+              <Text style={[st.cardCat, { color: C.text }]} numberOfLines={1}>{category}</Text>
+              <Text style={[st.cardPct, { color: pct >= 100 ? C.red : C.text2 }]}>{Math.round(pct)}%</Text>
+            </View>
+            <Text style={[st.cardAmts, { color: C.text2 }]}>
+              {fmt(spent, currency)} <Text style={{ color: C.text2 }}>/ {fmt(budget, currency)}</Text>
+            </Text>
+          </View>
         </View>
+        <View style={[st.barBg, { backgroundColor: C.surface2 }]}>
+          <Animated.View style={[st.barFill, { backgroundColor: barColor, width: widthAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }]} />
+        </View>
+        <Text style={[st.remaining, { color: remaining >= 0 ? C.text2 : C.red }]}>
+          {remaining >= 0 ? `Reste ${fmt(remaining, currency)}` : `Dépassé de ${fmt(Math.abs(remaining), currency)}`}
+        </Text>
+      </TouchableOpacity>
+      <View style={st.cardActions}>
+        <TouchableOpacity onPress={onEdit} style={[st.actionBtn, { backgroundColor: C.surface2 }]} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text style={{ fontSize: 14 }}>✏️</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onDelete} style={[st.actionBtn, { backgroundColor: C.surface2 }]} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text style={{ fontSize: 14 }}>🗑️</Text>
+        </TouchableOpacity>
       </View>
-      <View style={[st.barBg, { backgroundColor: C.surface2 }]}>
-        <Animated.View style={[st.barFill, { backgroundColor: barColor, width: widthAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }]} />
-      </View>
-      <Text style={[st.remaining, { color: remaining >= 0 ? C.text2 : C.red }]}>
-        {remaining >= 0 ? `Reste ${fmt(remaining, currency)}` : `Dépassé de ${fmt(Math.abs(remaining), currency)}`}
-      </Text>
-    </TouchableOpacity>
+    </View>
   )
 }
 
@@ -248,6 +270,8 @@ const st = StyleSheet.create({
   barBg: { height: 6, borderRadius: 3, overflow: 'hidden', marginBottom: 8 },
   barFill: { height: '100%', borderRadius: 3 },
   remaining: { fontSize: 12, fontWeight: '500' },
+  cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 8 },
+  actionBtn: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
   emptyText: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 24 },

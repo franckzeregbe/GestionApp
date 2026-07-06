@@ -77,7 +77,7 @@ export default function TransactionForm({ visible, editTx, theme, currency, onSa
     if (editTx) onEdit(editTx.id, tx)
     else onSave(tx)
     Animated.timing(slide, { toValue: SH, duration: 200, useNativeDriver: true }).start(onClose)
-  }, [form, useCustom, editTx, onSave, onEdit, onClose])
+  }, [form, editTx, onSave, onEdit, onClose])
 
   const set = (k: keyof FormState) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
