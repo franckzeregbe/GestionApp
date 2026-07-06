@@ -6,12 +6,14 @@ import { type Transaction, type CurrencyId } from '../types'
 import { COLORS, CHART_COLORS } from '../theme'
 import { MONTHS_SHORT } from '../utils/constants'
 import { fmt, fmtShort, convert, mkKey, parseDate } from '../utils/currency'
+import AmountText from '../components/AmountText'
 
 interface Props {
   transactions: Transaction[]
   theme: 'dark' | 'light'
   currentMonth: Date
   currency: CurrencyId
+  hideBalance?: boolean
 }
 
 function getAllMonths(n: number, from?: Date) {
@@ -28,7 +30,7 @@ function polarToCartesian(cx: number, cy: number, r: number, angle: number) {
   return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) }
 }
 
-export default function ChartsScreen({ transactions, theme, currentMonth, currency }: Props) {
+export default function ChartsScreen({ transactions, theme, currentMonth, currency, hideBalance }: Props) {
   const [containerWidth, setContainerWidth] = useState(0)
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     setContainerWidth(e.nativeEvent.layout.width)
@@ -131,7 +133,7 @@ export default function ChartsScreen({ transactions, theme, currentMonth, curren
                     <Path key={i} d={arc.d} fill={arc.color} />
                   ))}
                   <SvgText x={DONUT_CX} y={DONUT_CY - 8} fill={c.text} fontSize={18} fontWeight="bold" textAnchor="middle">
-                    {fmtShort(donutData.total, currency)}
+                    {hideBalance ? '••••' : fmtShort(donutData.total, currency)}
                   </SvgText>
                   <SvgText x={DONUT_CX} y={DONUT_CY + 12} fill={c.text2} fontSize={11} textAnchor="middle">
                     Total
@@ -142,7 +144,7 @@ export default function ChartsScreen({ transactions, theme, currentMonth, curren
                     <View key={i} style={s.legendRow}>
                       <View style={[s.legendDot, { backgroundColor: arc.color }]} />
                       <Text style={[s.legendText, { color: c.text }]} numberOfLines={1}>{arc.cat}</Text>
-                      <Text style={[s.legendValue, { color: c.text2 }]}>{fmtShort(arc.amount, currency)}</Text>
+                      <AmountText amount={arc.amount} currency={currency} hideBalance={hideBalance} short style={[s.legendValue, { color: c.text2 }]} />
                     </View>
                   ))}
                 </View>
@@ -172,7 +174,7 @@ export default function ChartsScreen({ transactions, theme, currentMonth, curren
                   <G key={i}>
                     <Line x1={BAR_L} y1={y} x2={CHART_W - BAR_R} y2={y} stroke={c.border} strokeWidth={1} />
                     <SvgText x={BAR_L - 6} y={y + 4} fill={c.text2} fontSize={10} textAnchor="end">
-                      {fmtShort(Math.round(maxVal * (1 - i / 2)), currency)}
+                      {hideBalance ? '••••' : fmtShort(Math.round(maxVal * (1 - i / 2)), currency)}
                     </SvgText>
                   </G>
                 )
@@ -201,16 +203,14 @@ export default function ChartsScreen({ transactions, theme, currentMonth, curren
           <View style={[s.card, { backgroundColor: c.surface }]}>
             <View style={s.chartHeader}>
               <Text style={[s.cardTitle, { color: c.text, marginBottom: 0 }]}>Solde cumulatif (12 mois)</Text>
-              <Text style={[s.currentVal, { color: lineData[lineData.length - 1] >= 0 ? c.green : c.red }]}>
-                {fmtShort(lineData[lineData.length - 1], currency)}
-              </Text>
+              <AmountText amount={lineData[lineData.length - 1]} currency={currency} hideBalance={hideBalance} short style={[s.currentVal, { color: lineData[lineData.length - 1] >= 0 ? c.green : c.red }]} />
             </View>
             <Svg width={CHART_W} height={CHART_H}>
               {yTicks.map((t, i) => (
                 <G key={i}>
                   <Line x1={LN_L} y1={t.y} x2={CHART_W - LN_R} y2={t.y} stroke={c.border} strokeWidth={1} />
                   <SvgText x={LN_L - 6} y={t.y + 4} fill={c.text2} fontSize={10} textAnchor="end">
-                    {fmtShort(t.v, currency)}
+                    {hideBalance ? '••••' : fmtShort(t.v, currency)}
                   </SvgText>
                 </G>
               ))}

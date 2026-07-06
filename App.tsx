@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { StatusBar } from 'expo-status-bar'
-import { View, StyleSheet, TouchableOpacity, Text, Platform, Alert } from 'react-native'
+import { View, StyleSheet, TouchableOpacity, Text, Platform, Alert, AppState } from 'react-native'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { NavigationContainer } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import PinScreen from './src/components/PinScreen'
 import DashboardScreen from './src/screens/DashboardScreen'
 import ChartsScreen from './src/screens/ChartsScreen'
 import TransactionsScreen from './src/screens/TransactionsScreen'
@@ -34,24 +35,44 @@ function AppContent() {
   const [showForm, setShowForm] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [activeTab, setActiveTab] = useState('Dashboard')
+  const [hideBalance, setHideBalance] = useState(false)
+  const [pinHash, setPinHash] = useState<string | null>(null)
+  const [lockScreen, setLockScreen] = useState(true)
+  const [pinSetupMode, setPinSetupMode] = useState<'none' | 'setup' | 'remove'>('none')
+  const [loaded, setLoaded] = useState(false)
   const C = COLORS[theme]
   const insets = useSafeAreaInsets()
 
   useEffect(() => {
     ;(async () => {
-      const [txs, bgs, savedTheme, savedCurrency] = await Promise.all([
+      const [txs, bgs, savedTheme, savedCurrency, savedPin, savedHide] = await Promise.all([
         loadTransactions(),
         loadBudgets(),
         AsyncStorage.getItem('gestion_theme'),
         AsyncStorage.getItem('gestion_currency'),
+        AsyncStorage.getItem('gestion_pin'),
+        AsyncStorage.getItem('gestion_hideBalance'),
       ])
       setTransactions(txs)
       setBudgets(bgs)
       if (savedTheme === 'light') setTheme('light')
       if (savedCurrency && ['cad', 'usd', 'fcfa', 'eur'].includes(savedCurrency))
         setCurrency(savedCurrency as CurrencyId)
+      setPinHash(savedPin)
+      setLockScreen(savedPin !== null)
+      setHideBalance(savedHide === 'true')
+      setLoaded(true)
     })()
   }, [])
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'background' && pinHash) {
+        setLockScreen(true)
+      }
+    })
+    return () => sub.remove()
+  }, [pinHash])
 
   const handleNavState = useCallback((state: any) => {
     const route = state?.routes?.[state.index]
@@ -182,6 +203,39 @@ function AppContent() {
     ])
   }, [])
 
+  const handleTogglePin = useCallback(() => {
+    if (pinHash) {
+      setPinSetupMode('remove')
+    } else {
+      setPinSetupMode('setup')
+    }
+  }, [pinHash])
+
+  const handlePinSetupSuccess = useCallback(async (pin?: string) => {
+    if (pin) {
+      const hash = (() => {
+        let h = 0
+        for (let i = 0; i < pin.length; i++) {
+          h = ((h << 5) - h) + pin.charCodeAt(i)
+          h |= 0
+        }
+        return 'pin_' + Math.abs(h).toString(36)
+      })()
+      await AsyncStorage.setItem('gestion_pin', hash)
+      setPinHash(hash)
+    } else {
+      await AsyncStorage.removeItem('gestion_pin')
+      setPinHash(null)
+    }
+    setPinSetupMode('none')
+  }, [])
+
+  const handleToggleHideBalance = useCallback(async () => {
+    const next = !hideBalance
+    setHideBalance(next)
+    await AsyncStorage.setItem('gestion_hideBalance', String(next))
+  }, [hideBalance])
+
   const isDash = activeTab === 'Dashboard'
   const monthLabel = viewMode === 'year'
     ? `${currentMonth.getFullYear()}`
@@ -191,27 +245,27 @@ function AppContent() {
     <DashboardScreen
       transactions={transactions} budgets={budgets} onDeleteTx={handleDeleteTx}
       currentMonth={currentMonth} viewMode={viewMode} onViewModeChange={setViewMode}
-      theme={theme} currency={currency}
+      theme={theme} currency={currency} hideBalance={hideBalance}
     />
-  ), [transactions, budgets, handleDeleteTx, currentMonth, viewMode, theme, currency])
+  ), [transactions, budgets, handleDeleteTx, currentMonth, viewMode, theme, currency, hideBalance])
 
   const renderCharts = useCallback(() => (
-    <ChartsScreen transactions={transactions} theme={theme} currentMonth={currentMonth} currency={currency} />
-  ), [transactions, currentMonth, theme, currency])
+    <ChartsScreen transactions={transactions} theme={theme} currentMonth={currentMonth} currency={currency} hideBalance={hideBalance} />
+  ), [transactions, currentMonth, theme, currency, hideBalance])
 
   const renderTransactions = useCallback(() => (
     <TransactionsScreen
       transactions={transactions} onDeleteTx={handleDeleteTx}
-      onEditTransaction={handleOpenForm} theme={theme} currency={currency}
+      onEditTransaction={handleOpenForm} theme={theme} currency={currency} hideBalance={hideBalance}
     />
-  ), [transactions, handleDeleteTx, handleOpenForm, theme, currency])
+  ), [transactions, handleDeleteTx, handleOpenForm, theme, currency, hideBalance])
 
   const renderBudgets = useCallback(() => (
     <BudgetsScreen
       transactions={transactions} budgets={budgets} onSaveBudget={handleSaveBudget}
-      onDeleteBudget={handleDeleteBudget} currentMonth={currentMonth} theme={theme} currency={currency}
+      onDeleteBudget={handleDeleteBudget} currentMonth={currentMonth} theme={theme} currency={currency} hideBalance={hideBalance}
     />
-  ), [transactions, budgets, handleSaveBudget, handleDeleteBudget, currentMonth, theme, currency])
+  ), [transactions, budgets, handleSaveBudget, handleDeleteBudget, currentMonth, theme, currency, hideBalance])
 
   const TAB_H = 60
   const tabBarStyle = {
@@ -222,6 +276,17 @@ function AppContent() {
     paddingBottom: insets.bottom || 8,
     paddingTop: 6,
     elevation: 0,
+  }
+
+  if (!loaded) return null
+  if (lockScreen && pinHash) {
+    return (
+      <PinScreen
+        mode="lock"
+        storedPinHash={pinHash}
+        onSuccess={() => setLockScreen(false)}
+      />
+    )
   }
 
   return (
@@ -244,6 +309,12 @@ function AppContent() {
             </TouchableOpacity>
             <TouchableOpacity onPress={toggleCurrency} style={[styles.pill, { backgroundColor: C.surface2 }]}>
               <Text style={[styles.pillText, { color: C.text2 }]}>{CURRENCY_LABELS[currency]}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleToggleHideBalance} style={[styles.pill, { backgroundColor: C.surface2 }]}>
+              <Text style={styles.pillText}>{hideBalance ? '👁️‍🗨️' : '👁️'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleTogglePin} style={[styles.pill, { backgroundColor: C.surface2 }]}>
+              <Text style={styles.pillText}>{pinHash ? '🔒' : '🔓'}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={toggleTheme} style={[styles.pill, { backgroundColor: C.surface2 }]}>
               <Text style={styles.pillText}>{theme === 'dark' ? '🌙' : '☀️'}</Text>
@@ -361,6 +432,15 @@ function AppContent() {
         onEdit={handleEditTx}
         onClose={handleCloseForm}
       />
+
+      {pinSetupMode !== 'none' && (
+        <PinScreen
+          mode={pinSetupMode === 'remove' ? 'lock' : 'setup'}
+          storedPinHash={pinHash}
+          onSuccess={(pin) => handlePinSetupSuccess(pinSetupMode === 'setup' ? pin : undefined)}
+          onCancel={() => setPinSetupMode('none')}
+        />
+      )}
     </View>
   )
 }

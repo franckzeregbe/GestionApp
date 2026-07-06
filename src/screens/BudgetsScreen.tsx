@@ -10,6 +10,7 @@ import { CATEGORIES, ICONS } from '../utils/constants'
 import { fmt, convert, mkKey } from '../utils/currency'
 import CategoryPicker from '../components/CategoryPicker'
 import type { Transaction, Budgets, CurrencyId } from '../types'
+import AmountText from '../components/AmountText'
 
 const { height: SH } = Dimensions.get('window')
 
@@ -21,9 +22,10 @@ interface Props {
   currentMonth: Date
   theme: 'dark' | 'light'
   currency: CurrencyId
+  hideBalance?: boolean
 }
 
-export default function BudgetsScreen({ transactions, budgets, onSaveBudget, onDeleteBudget, currentMonth, theme, currency }: Props) {
+export default function BudgetsScreen({ transactions, budgets, onSaveBudget, onDeleteBudget, currentMonth, theme, currency, hideBalance }: Props) {
   const C = COLORS[theme]
   const insets = useSafeAreaInsets()
   const monthKey = mkKey(currentMonth)
@@ -102,11 +104,11 @@ export default function BudgetsScreen({ transactions, budgets, onSaveBudget, onD
           <View style={st.summaryRow}>
             <View>
               <Text style={[st.summaryLabel, { color: C.text2 }]}>Total sorti</Text>
-              <Text style={[st.summaryVal, { color: C.red }]}>{fmt(totalSpent, currency)}</Text>
+              <AmountText amount={totalSpent} currency={currency} hideBalance={hideBalance} style={[st.summaryVal, { color: C.red }]} />
             </View>
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={[st.summaryLabel, { color: C.text2 }]}>Budget total</Text>
-              <Text style={[st.summaryVal, { color: C.text }]}>{fmt(totalBudget, currency)}</Text>
+              <AmountText amount={totalBudget} currency={currency} hideBalance={hideBalance} style={[st.summaryVal, { color: C.text }]} />
             </View>
           </View>
           <View style={[st.globalBarBg, { backgroundColor: C.surface2 }]}>
@@ -135,7 +137,7 @@ export default function BudgetsScreen({ transactions, budgets, onSaveBudget, onD
               <BudgetCard
                 key={cat} category={cat} icon={ICONS[cat] || '📁'}
                 spent={spent} budget={budget} pct={pct}
-                barColor={barColor} C={C} currency={currency}
+                barColor={barColor} C={C} currency={currency} hideBalance={hideBalance}
                 onEdit={() => openEdit(cat)} onDelete={() => confirmDelete(cat)}
               />
             )
@@ -201,9 +203,9 @@ export default function BudgetsScreen({ transactions, budgets, onSaveBudget, onD
   )
 }
 
-function BudgetCard({ category, icon, spent, budget, pct, barColor, C, currency, onEdit, onDelete }: {
+function BudgetCard({ category, icon, spent, budget, pct, barColor, C, currency, hideBalance, onEdit, onDelete }: {
   category: string; icon: string; spent: number; budget: number; pct: number
-  barColor: string; C: Record<string, string>; currency: CurrencyId; onEdit: () => void; onDelete: () => void
+  barColor: string; C: Record<string, string>; currency: CurrencyId; hideBalance?: boolean; onEdit: () => void; onDelete: () => void
 }) {
   const widthAnim = useRef(new Animated.Value(0)).current
   useEffect(() => {
@@ -224,7 +226,7 @@ function BudgetCard({ category, icon, spent, budget, pct, barColor, C, currency,
               <Text style={[st.cardPct, { color: pct >= 100 ? C.red : C.text2 }]}>{Math.round(pct)}%</Text>
             </View>
             <Text style={[st.cardAmts, { color: C.text2 }]}>
-              {fmt(spent, currency)} <Text style={{ color: C.text2 }}>/ {fmt(budget, currency)}</Text>
+              <AmountText amount={spent} currency={currency} hideBalance={hideBalance} /> <Text style={{ color: C.text2 }}>/ <AmountText amount={budget} currency={currency} hideBalance={hideBalance} /></Text>
             </Text>
           </View>
         </View>
@@ -232,7 +234,7 @@ function BudgetCard({ category, icon, spent, budget, pct, barColor, C, currency,
           <Animated.View style={[st.barFill, { backgroundColor: barColor, width: widthAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }]} />
         </View>
         <Text style={[st.remaining, { color: remaining >= 0 ? C.text2 : C.red }]}>
-          {remaining >= 0 ? `Reste ${fmt(remaining, currency)}` : `Dépassé de ${fmt(Math.abs(remaining), currency)}`}
+          {remaining >= 0 ? <>Reste <AmountText amount={remaining} currency={currency} hideBalance={hideBalance} /></> : <>Dépassé de <AmountText amount={Math.abs(remaining)} currency={currency} hideBalance={hideBalance} /></>}
         </Text>
       </TouchableOpacity>
       <View style={st.cardActions}>

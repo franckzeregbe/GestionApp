@@ -6,6 +6,7 @@ import { COLORS } from '../theme'
 import { MONTHS_FR, MONTHS_SHORT, ICONS } from '../utils/constants'
 import { fmt, fmtShort, fmtC, fmtShortC, convert, mkKey, parseDate } from '../utils/currency'
 import { type Transaction, type Budgets, type CurrencyId } from '../types'
+import AmountText from '../components/AmountText'
 
 interface Props {
   transactions: Transaction[]
@@ -16,9 +17,10 @@ interface Props {
   onViewModeChange: (v: 'month' | 'year') => void
   theme: 'dark' | 'light'
   currency: CurrencyId
+  hideBalance?: boolean
 }
 
-export default function DashboardScreen({ transactions, budgets, onDeleteTx, currentMonth, viewMode, theme, currency }: Props) {
+export default function DashboardScreen({ transactions, budgets, onDeleteTx, currentMonth, viewMode, theme, currency, hideBalance }: Props) {
   const [width, setWidth] = useState(0)
   const onLayout = useCallback((e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width), [])
   const C = COLORS[theme]
@@ -114,31 +116,25 @@ export default function DashboardScreen({ transactions, budgets, onDeleteTx, cur
         <Text style={[st.balLabel, { color: C.text2 }]}>
           {viewMode === 'year' ? `Bilan ${yr}` : `Solde — ${MONTHS_FR[mo]}`}
         </Text>
-        <Text style={[st.balAmount, { color: monthData.balance >= 0 ? C.green : C.red }]}>
-          {fmt(viewMode === 'year' ? yearSummary.net : monthData.balance, currency)}
-        </Text>
+        <AmountText amount={viewMode === 'year' ? yearSummary.net : monthData.balance} currency={currency} hideBalance={hideBalance} style={[st.balAmount, { color: monthData.balance >= 0 ? C.green : C.red }]} />
         <View style={[st.balDivider, { backgroundColor: C.border }]} />
         <View style={st.balRow}>
           <View style={st.balItem}>
             <Text style={[st.balItemLabel, { color: C.text2 }]}>↑ Entrées</Text>
-            <Text style={[st.balItemVal, { color: C.green }]}>
-              {fmt(viewMode === 'year' ? yearSummary.inc : monthData.inc, currency)}
-            </Text>
+            <AmountText amount={viewMode === 'year' ? yearSummary.inc : monthData.inc} currency={currency} hideBalance={hideBalance} style={[st.balItemVal, { color: C.green }]} />
           </View>
           <View style={[st.balSep, { backgroundColor: C.border }]} />
           <View style={st.balItem}>
             <Text style={[st.balItemLabel, { color: C.text2 }]}>↓ Sorties</Text>
-            <Text style={[st.balItemVal, { color: C.red }]}>
-              {fmt(viewMode === 'year' ? yearSummary.exp : monthData.exp, currency)}
-            </Text>
+            <AmountText amount={viewMode === 'year' ? yearSummary.exp : monthData.exp} currency={currency} hideBalance={hideBalance} style={[st.balItemVal, { color: C.red }]} />
           </View>
         </View>
       </View>
 
       {/* Stats row */}
       <View style={st.statsRow}>
-        <StatCard label="Moy. entrées" value={fmtShort(Math.round(avgData.inc), currency)} color={C.green} C={C} />
-        <StatCard label="Moy. sorties" value={fmtShort(Math.round(avgData.exp), currency)} color={C.red} C={C} />
+        <StatCard label="Moy. entrées" value={<AmountText amount={Math.round(avgData.inc)} currency={currency} hideBalance={hideBalance} short />} color={C.green} C={C} />
+        <StatCard label="Moy. sorties" value={<AmountText amount={Math.round(avgData.exp)} currency={currency} hideBalance={hideBalance} short />} color={C.red} C={C} />
         <StatCard label="Transactions" value={String(transactions.length)} color={C.primary} C={C} />
       </View>
 
@@ -162,16 +158,14 @@ export default function DashboardScreen({ transactions, budgets, onDeleteTx, cur
                       <View style={[st.miniBar, { backgroundColor: C.surface2, marginTop: 3 }]}>
                         <View style={[st.miniBarFill, { width: `${(m.exp / maxV) * 100}%`, backgroundColor: C.red }]} />
                       </View>
-                      <Text style={[st.monthCardNet, { color: m.net >= 0 ? C.green : C.red }]} numberOfLines={1}>
-                        {fmtShort(m.net, currency)}
-                      </Text>
+                      <AmountText amount={m.net} currency={currency} hideBalance={hideBalance} short style={[st.monthCardNet, { color: m.net >= 0 ? C.green : C.red }]} numberOfLines={1} />
                     </>
                   )}
                 </View>
               )
             })}
           </View>
-          <ProjectionTable projection={projection} C={C} currency={currency} />
+          <ProjectionTable projection={projection} C={C} currency={currency} hideBalance={hideBalance} />
         </>
       ) : (
         <>
@@ -206,7 +200,7 @@ export default function DashboardScreen({ transactions, budgets, onDeleteTx, cur
                   <View style={{ flex: 1 }}>
                     <View style={st.expTop}>
                       <Text style={[st.expName, { color: C.text }]} numberOfLines={1}>{cat}</Text>
-                      <Text style={[st.expAmt, { color: C.red }]}>{fmt(amt, currency)}</Text>
+                      <AmountText amount={amt} currency={currency} hideBalance={hideBalance} style={[st.expAmt, { color: C.red }]} />
                     </View>
                     <View style={[st.expBarBg, { backgroundColor: C.surface2 }]}>
                       <View style={[st.expBarFill, { width: `${(amt / (topExpenses[0][1] || 1)) * 100}%`, backgroundColor: C.red }]} />
@@ -218,7 +212,7 @@ export default function DashboardScreen({ transactions, budgets, onDeleteTx, cur
             ))}
           </View>
 
-          <ProjectionTable projection={projection} C={C} currency={currency} />
+          <ProjectionTable projection={projection} C={C} currency={currency} hideBalance={hideBalance} />
         </>
       )}
     </ScrollView>
@@ -229,7 +223,7 @@ function SectionTitle({ title, C }: { title: string; C: Record<string, string> }
   return <Text style={[st.sectionTitle, { color: C.text }]}>{title}</Text>
 }
 
-function StatCard({ label, value, color, C }: { label: string; value: string; color: string; C: Record<string, string> }) {
+function StatCard({ label, value, color, C }: { label: string; value: React.ReactNode; color: string; C: Record<string, string> }) {
   return (
     <View style={[st.statCard, { backgroundColor: C.surface, borderColor: C.border }]}>
       <Text style={[st.statVal, { color }]}>{value}</Text>
@@ -238,7 +232,7 @@ function StatCard({ label, value, color, C }: { label: string; value: string; co
   )
 }
 
-function ProjectionTable({ projection, C, currency }: { projection: { label: string; inc: number; exp: number; net: number }[]; C: Record<string, string>; currency: CurrencyId }) {
+function ProjectionTable({ projection, C, currency, hideBalance }: { projection: { label: string; inc: number; exp: number; net: number }[]; C: Record<string, string>; currency: CurrencyId; hideBalance?: boolean }) {
   return (
     <>
       <SectionTitle title="🔮 Prévisions" C={C} />
@@ -251,9 +245,9 @@ function ProjectionTable({ projection, C, currency }: { projection: { label: str
         {projection.map((p, i) => (
           <View key={i} style={[st.projRow, i < projection.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border }]}>
             <Text style={[st.projCell, { color: C.text, textAlign: 'left', flex: 1.4 }]} numberOfLines={1}>{p.label}</Text>
-            <Text style={[st.projCell, { color: C.green }]}>{fmtShort(p.inc, currency)}</Text>
-            <Text style={[st.projCell, { color: C.red }]}>{fmtShort(p.exp, currency)}</Text>
-            <Text style={[st.projCell, { color: p.net >= 0 ? C.green : C.red }]}>{fmtShort(p.net, currency)}</Text>
+            <AmountText amount={p.inc} currency={currency} hideBalance={hideBalance} short style={[st.projCell, { color: C.green }]} />
+            <AmountText amount={p.exp} currency={currency} hideBalance={hideBalance} short style={[st.projCell, { color: C.red }]} />
+            <AmountText amount={p.net} currency={currency} hideBalance={hideBalance} short style={[st.projCell, { color: p.net >= 0 ? C.green : C.red }]} />
           </View>
         ))}
       </View>

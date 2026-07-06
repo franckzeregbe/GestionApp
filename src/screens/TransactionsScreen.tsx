@@ -9,6 +9,7 @@ import { type Transaction, type CurrencyId } from '../types'
 import { ICONS, MONTHS_SHORT } from '../utils/constants'
 import { fmt, convert } from '../utils/currency'
 import { COLORS } from '../theme'
+import AmountText from '../components/AmountText'
 
 const { height: SH } = Dimensions.get('window')
 
@@ -18,6 +19,7 @@ interface Props {
   onEditTransaction: (tx: Transaction) => void
   theme: 'dark' | 'light'
   currency: CurrencyId
+  hideBalance?: boolean
 }
 
 type Filter = 'all' | 'income' | 'expense'
@@ -29,7 +31,7 @@ function fmtDate(s: string): string {
   } catch { return s }
 }
 
-export default function TransactionsScreen({ transactions, onDeleteTx, onEditTransaction, theme, currency }: Props) {
+export default function TransactionsScreen({ transactions, onDeleteTx, onEditTransaction, theme, currency, hideBalance }: Props) {
   const C = COLORS[theme]
   const insets = useSafeAreaInsets()
   const slide = useRef(new Animated.Value(SH)).current
@@ -81,11 +83,11 @@ export default function TransactionsScreen({ transactions, onDeleteTx, onEditTra
   const handleDelete = useCallback(() => {
     const tx = actionTx
     if (!tx) return
-    Alert.alert('Supprimer ?', `"${tx.category}" — ${fmt(convert(tx.amount, tx.currency ?? currency, currency), currency)}`, [
+    Alert.alert('Supprimer ?', `"${tx.category}" — ${hideBalance ? '••••' : fmt(convert(tx.amount, tx.currency ?? currency, currency), currency)}`, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: () => { onDeleteTx(tx.id); closeAction() } },
     ])
-  }, [actionTx, onDeleteTx, closeAction, currency])
+  }, [actionTx, onDeleteTx, closeAction, currency, hideBalance])
 
   const renderItem = useCallback(({ item }: { item: Transaction }) => {
     const isIncome = item.type === 'income'
@@ -104,12 +106,12 @@ export default function TransactionsScreen({ transactions, onDeleteTx, onEditTra
           {item.note ? <Text style={[st.itemNote, { color: C.text2 }]} numberOfLines={1}>{item.note}</Text> : null}
         </View>
         <View style={st.itemRight}>
-          <Text style={[st.itemAmt, { color }]}>{isIncome ? '+' : '−'} {fmt(convert(item.amount, item.currency ?? currency, currency), currency)}</Text>
+          <Text style={[st.itemAmt, { color }]}>{isIncome ? '+' : '−'} <AmountText amount={convert(item.amount, item.currency ?? currency, currency)} currency={currency} hideBalance={hideBalance} /></Text>
           <Text style={[st.itemDate, { color: C.text2 }]}>{fmtDate(item.date)}</Text>
         </View>
       </TouchableOpacity>
     )
-  }, [C, currency, openAction])
+  }, [C, currency, openAction, hideBalance])
 
   const FILTERS: { key: Filter; label: string }[] = [
     { key: 'all', label: 'Tout' },
@@ -125,17 +127,17 @@ export default function TransactionsScreen({ transactions, onDeleteTx, onEditTra
         <View style={[st.summary, { backgroundColor: C.surface, borderColor: C.border }]}>
           <View style={st.summaryItem}>
             <Text style={[st.summaryLabel, { color: C.text2 }]}>Entrées</Text>
-            <Text style={[st.summaryVal, { color: C.green }]}>{fmt(totals.inc, currency)}</Text>
+            <AmountText amount={totals.inc} currency={currency} hideBalance={hideBalance} style={[st.summaryVal, { color: C.green }]} />
           </View>
           <View style={[st.summarySep, { backgroundColor: C.border }]} />
           <View style={st.summaryItem}>
             <Text style={[st.summaryLabel, { color: C.text2 }]}>Sorties</Text>
-            <Text style={[st.summaryVal, { color: C.red }]}>{fmt(totals.exp, currency)}</Text>
+            <AmountText amount={totals.exp} currency={currency} hideBalance={hideBalance} style={[st.summaryVal, { color: C.red }]} />
           </View>
           <View style={[st.summarySep, { backgroundColor: C.border }]} />
           <View style={st.summaryItem}>
             <Text style={[st.summaryLabel, { color: C.text2 }]}>Net</Text>
-            <Text style={[st.summaryVal, { color: totals.net >= 0 ? C.green : C.red }]}>{fmt(totals.net, currency)}</Text>
+            <AmountText amount={totals.net} currency={currency} hideBalance={hideBalance} style={[st.summaryVal, { color: totals.net >= 0 ? C.green : C.red }]} />
           </View>
         </View>
       )}
@@ -212,7 +214,7 @@ export default function TransactionsScreen({ transactions, onDeleteTx, onEditTra
                 <View style={{ flex: 1 }}>
                   <Text style={[st.sheetCat, { color: C.text }]}>{actionTx.category}</Text>
                   <Text style={[st.sheetAmt, { color: actionTx.type === 'income' ? C.green : C.red }]}>
-                    {actionTx.type === 'income' ? '+' : '−'} {fmt(convert(actionTx.amount, actionTx.currency ?? currency, currency), currency)}
+                    {actionTx.type === 'income' ? '+' : '−'} <AmountText amount={convert(actionTx.amount, actionTx.currency ?? currency, currency)} currency={currency} hideBalance={hideBalance} />
                   </Text>
                   {actionTx.note ? <Text style={[st.sheetNote, { color: C.text2 }]}>{actionTx.note}</Text> : null}
                 </View>
